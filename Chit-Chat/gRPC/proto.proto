@@ -1,0 +1,47 @@
+syntax = "proto3";
+option go_package = "Chit_Chat/grpc/proto";
+
+message joinRequest {
+  string client_id  = 1;
+  int64 logical_time = 2;
+
+}
+
+message publishRequest {
+  string client_id = 1;
+  string content = 2;
+  int64 logical_time = 3;
+
+}
+
+message leaveRequest {
+  string client_id = 1;
+  int64 logical_time = 2;
+
+}
+
+message chatMessage {
+  string from = 1;
+  string message = 2;
+  int64 logical_time = 3;
+}
+
+message ack {
+  bool success = 1;
+  string error = 2;
+  int64 logical_time = 3;
+
+}
+
+message empty {
+
+}
+
+service Chit_Chat {
+
+  rpc Join(joinRequest) returns (stream chatMessage);
+
+  rpc Publish(publishRequest) returns (ack);
+
+  rpc Leave(leaveRequest) returns (ack);
+}
