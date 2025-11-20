@@ -15,6 +15,7 @@ import (
 )
 
 
+
 type Server struct {
 	grpcServer *grpc.Server
 	proto.UnimplementedReplicationServer
@@ -22,10 +23,15 @@ type Server struct {
 	clientsMu sync.Mutex
 
 	lTime int64
-	curretHighestBid int64
+	currentHighestBid int64
+
+	done bool
+	startTime time.Time
+
+	lastHeartbeat time.Time
+    isLeader      bool
+
 }
-
-
 
 func main() {
 	server := &Server{}
@@ -39,11 +45,34 @@ func (s *Server) StartServer() {
 	}
 
 	s.lTime = 0
-	s.curretHighestBid = 0
-
+	s.currentHighestBid = 0
+	s.done = false
+	s.startTime = time.Now()
+	s.lastHeartbeat = time.Now()
+	s.isLeader = false
 
 	s.grpcServer = grpc.NewServer()
 	proto.RegisterReplicationServer(s.grpcServer, s)
+
+	go func() {
+		for {
+			time.Sleep(1 * time.Second)
+			s.clientsMu.Lock()
+			if !s.isLeader && time.Since(s.lastHeartbeat) > 20*time.Second {
+				s.isLeader = true
+				log.Println("Primary down — secondary taking over")
+				go func() {
+					auctionDuration := 200 * time.Second
+					time.Sleep(auctionDuration)
+					s.clientsMu.Lock()
+					s.done = true
+					s.clientsMu.Unlock()
+					log.Println("Auction is now over")
+				}()
+			}
+			s.clientsMu.Unlock()
+		}
+	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -63,17 +92,33 @@ func (s *Server) StopServer() {
 	log.Println("Server stopped")
 }
 
+func (s* Server) Heartbeat(ctx context.Context, req *proto.Heartbeat) (*proto.Empty, error) {
+	s.lastHeartbeat = time.Now()
+	return &proto.Empty{}, nil
+}
 
-func (s *Server) Bid(ctx context.Context, req *proto.Bid) (*proto.Ack, error) {
+func (s* Server) Bid(ctx context.Context, req *proto.Bid) (*proto.Ack, error) {
+	if s.done {
+		return &proto.Ack{Success: false, LogicalTime: s.lTime}, nil
+	}
+
+	if req.MessageBid > s.currentHighestBid {
+		s.currentHighestBid = req.MessageBid
+		log.Printf("New highest bid: %d at logical time %d", s.currentHighestBid, s.lTime)
+	} else {
+		log.Printf("Bid of %d rejected; current highest bid is %d at logical time %d", req.MessageBid, s.currentHighestBid, s.lTime)
+		return &proto.Ack{Success: false, LogicalTime: s.lTime}, nil
+	}
+
 	return &proto.Ack{Success: true, LogicalTime: s.lTime}, nil
 }
 
-func (s *Server) Result(ctx context.Context, req *proto.Result) (*proto.CurrentBid, error) {
-	return &proto.CurrentBid{Money: s.curretHighestBid, LogicalTime: s.lTime}, nil
+func (s* Server) Result(ctx context.Context, req *proto.Result) (*proto.CurrentBid, error) {
+
+	if s.done {
+		return &proto.CurrentBid{Money: s.currentHighestBid, LogicalTime: s.lTime, Message: "auction is done"}, nil
+	}
+
+	return &proto.CurrentBid{Money: s.currentHighestBid, LogicalTime: s.lTime}, nil
 }
-
-
-
-
-
 

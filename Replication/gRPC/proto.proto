@@ -27,6 +27,7 @@ message ack {
 message currentBid {
   int64 money = 1;
   int64 logical_time = 2;
+  string message = 3;
 }
 
 message empty {
