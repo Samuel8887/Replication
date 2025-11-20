@@ -1,36 +1,33 @@
 syntax = "proto3";
 option go_package = "Chit_Chat/grpc/proto";
 
-message joinRequest {
-  string client_id  = 1;
+message bid{
+  int64 message_bid = 1;
   int64 logical_time = 2;
-
+  string client_id = 3;
 }
 
-message publishRequest {
-  string client_id = 1;
-  string content = 2;
-  int64 logical_time = 3;
-
-}
-
-message leaveRequest {
-  string client_id = 1;
-  int64 logical_time = 2;
-
-}
-
-message chatMessage {
-  string from = 1;
-  string message = 2;
+message result{
+  int64 message_result = 1;
+  string client_id = 2;
   int64 logical_time = 3;
 }
+
+message heartbeat {
+  bool succes = 1;
+  int64 logical_time = 2;
+}
+
 
 message ack {
   bool success = 1;
   string error = 2;
   int64 logical_time = 3;
+}
 
+message currentBid {
+  int64 money = 1;
+  int64 logical_time = 2;
 }
 
 message empty {
@@ -39,9 +36,9 @@ message empty {
 
 service Chit_Chat {
 
-  rpc Join(joinRequest) returns (stream chatMessage);
+  rpc Bid(bid) returns (ack);
 
-  rpc Publish(publishRequest) returns (ack);
+  rpc Result(result) returns (currentBid);
 
-  rpc Leave(leaveRequest) returns (ack);
+  rpc Heartbeat(heartbeat) returns (empty);
 }
