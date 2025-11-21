@@ -26,7 +26,7 @@ type Server struct {
 	currentHighestBid int64
 
 	done bool
-	startTime time.Time
+	elapsedTime int64
 
 	lastHeartbeat time.Time
     isLeader      bool
@@ -47,7 +47,6 @@ func (s *Server) StartServer() {
 	s.lTime = 0
 	s.currentHighestBid = 0
 	s.done = false
-	s.startTime = time.Now()
 	s.lastHeartbeat = time.Now()
 	s.isLeader = false
 
@@ -58,11 +57,13 @@ func (s *Server) StartServer() {
 		for {
 			time.Sleep(1 * time.Second)
 			s.clientsMu.Lock()
-			if !s.isLeader && time.Since(s.lastHeartbeat) > 20*time.Second {
+			if !s.isLeader && time.Since(s.lastHeartbeat) > 10*time.Second {
 				s.isLeader = true
 				log.Println("Primary down — secondary taking over")
 				go func() {
-					auctionDuration := 200 * time.Second
+					elapsed := time.Duration(s.elapsedTime) * time.Second
+					auctionDuration := 200*time.Second - elapsed
+					log.Println("Auction will run for another", auctionDuration)
 					time.Sleep(auctionDuration)
 					s.clientsMu.Lock()
 					s.done = true
@@ -94,6 +95,10 @@ func (s *Server) StopServer() {
 
 func (s* Server) Heartbeat(ctx context.Context, req *proto.Heartbeat) (*proto.Empty, error) {
 	s.lastHeartbeat = time.Now()
+	s.currentHighestBid = req.HighestBid
+	s.lTime = req.LogicalTime
+	s.done = req.Done
+	s.elapsedTime = req.ElapsedTime
 	return &proto.Empty{}, nil
 }
 

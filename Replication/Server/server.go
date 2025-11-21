@@ -29,6 +29,7 @@ type Server struct {
 	done bool
 	startTime time.Time
 	sendHeartbeatsToSecondary func()
+	elapsedTime int64
 
 
 }
@@ -61,12 +62,19 @@ func (s *Server) StartServer() {
 	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
-
+		
 		for {
 			<-ticker.C
+			s.clientsMu.Lock()
+			s.elapsedTime = int64(time.Since(s.startTime).Seconds())
+			highest := s.currentHighestBid
+			s.clientsMu.Unlock()
 			_, err := secondaryClient.Heartbeat(context.Background(), &proto.Heartbeat{
 				Succes:   true,
 				LogicalTime: s.lTime,
+				HighestBid: highest,
+				ElapsedTime: s.elapsedTime,
+				Done: 	s.done,
 			})
 			if err != nil {
 				log.Println("Failed to send heartbeat to secondary:", err)

@@ -16,6 +16,9 @@ message result{
 message heartbeat {
   bool succes = 1;
   int64 logical_time = 2;
+  int64 highest_bid = 3;
+  int64 elapsed_time = 4;
+  bool done = 5;
 }
 
 message ack {
