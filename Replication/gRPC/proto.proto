@@ -19,6 +19,8 @@ message heartbeat {
   int64 highest_bid = 3;
   int64 elapsed_time = 4;
   bool done = 5;
+  string highest_bidder_now = 6;
+  repeated string array_bids = 7;
 }
 
 message ack {

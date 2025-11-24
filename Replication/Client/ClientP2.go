@@ -46,7 +46,7 @@ func main() {
 		if command == "bid" {
 			logicalTime++
 			response, err := client.Bid(context.Background(), &proto.Bid{
-				ClientId: "P1", LogicalTime: int64(logicalTime), MessageBid: int64(bud),
+				ClientId: "2", LogicalTime: int64(logicalTime), MessageBid: int64(bud),
 			})
 			if err != nil {
 				//log.Println("Error placing bid: %v", err)
@@ -56,19 +56,19 @@ func main() {
         		}
 				client1 := proto.NewReplicationClient(conn1)
 				response, err = client1.Bid(context.Background(), &proto.Bid{
-				ClientId: "P1", LogicalTime: int64(logicalTime), MessageBid: int64(bud),
+				ClientId: "2", LogicalTime: int64(logicalTime), MessageBid: int64(bud),
 				})
 				if err != nil {
             		log.Fatalf("Backup server also failed: %v", err)
         		}
 			}
-			fmt.Printf("Bid Response: %t (Logical Time: %d)\n", response.Success, response.LogicalTime)
+			fmt.Printf("Bid Response: %t\n", response.Success)
 		}
 
 		if command == "result" {
 			logicalTime++
 			response, err := client.Result(context.Background(), &proto.Result{
-				ClientId: "P1", LogicalTime: int64(logicalTime),
+				ClientId: "2", LogicalTime: int64(logicalTime),
 			})
 			if err != nil {
 				//log.Println("Error placing bid: %v", err)
@@ -78,14 +78,14 @@ func main() {
         		}
 				client1 := proto.NewReplicationClient(conn1)
 				response, err = client1.Result(context.Background(), &proto.Result{
-				ClientId: "P1", LogicalTime: int64(logicalTime),
+				ClientId: "2", LogicalTime: int64(logicalTime),
 				})
 				if err != nil {
             		log.Fatalf("Backup server also failed: %v", err)
         		}
 
 			}
-			fmt.Printf("Current Highest Bid: %d (Logical Time: %d)\n", response.Money, response.LogicalTime)
+			fmt.Printf("Current Highest Bid: %d \n", response.Money)
 			if response.Message != "" {
 				fmt.Printf("Message from server: %s\n", response.Message)
 			}

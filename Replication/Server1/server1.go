@@ -14,23 +14,24 @@ import (
 	"google.golang.org/grpc"
 )
 
-
-
 type Server struct {
 	grpcServer *grpc.Server
 	proto.UnimplementedReplicationServer
 
 	clientsMu sync.Mutex
 
-	lTime int64
+	lTime             int64
 	currentHighestBid int64
 
-	done bool
+	done        bool
 	elapsedTime int64
 
 	lastHeartbeat time.Time
-    isLeader      bool
+	isLeader      bool
 
+	highestBidder string
+
+	clients []string
 }
 
 func main() {
@@ -69,6 +70,8 @@ func (s *Server) StartServer() {
 					s.done = true
 					s.clientsMu.Unlock()
 					log.Println("Auction is now over")
+					log.Printf("The winner is id: %s with bid: %d", s.highestBidder, s.currentHighestBid)
+
 				}()
 			}
 			s.clientsMu.Unlock()
@@ -93,32 +96,49 @@ func (s *Server) StopServer() {
 	log.Println("Server stopped")
 }
 
-func (s* Server) Heartbeat(ctx context.Context, req *proto.Heartbeat) (*proto.Empty, error) {
+func (s *Server) Heartbeat(ctx context.Context, req *proto.Heartbeat) (*proto.Empty, error) {
 	s.lastHeartbeat = time.Now()
 	s.currentHighestBid = req.HighestBid
 	s.lTime = req.LogicalTime
 	s.done = req.Done
 	s.elapsedTime = req.ElapsedTime
+	s.highestBidder = req.HighestBidderNow
+	s.clients = req.ArrayBids
 	return &proto.Empty{}, nil
 }
 
-func (s* Server) Bid(ctx context.Context, req *proto.Bid) (*proto.Ack, error) {
+func (s *Server) Bid(ctx context.Context, req *proto.Bid) (*proto.Ack, error) {
 	if s.done {
 		return &proto.Ack{Success: false, LogicalTime: s.lTime}, nil
 	}
 
+	found := false
+	for _, n := range s.clients {
+
+		if n == req.ClientId {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		s.clients = append(s.clients, req.ClientId)
+		log.Printf("First bid from id: %s, added to registry.", req.ClientId)
+	}
+
 	if req.MessageBid > s.currentHighestBid {
 		s.currentHighestBid = req.MessageBid
-		log.Printf("New highest bid: %d at logical time %d", s.currentHighestBid, s.lTime)
+		s.highestBidder = req.ClientId
+		log.Printf("New highest bid: %d", s.currentHighestBid)
 	} else {
-		log.Printf("Bid of %d rejected; current highest bid is %d at logical time %d", req.MessageBid, s.currentHighestBid, s.lTime)
+		log.Printf("Bid of %d rejected; current highest bid is %d", req.MessageBid, s.currentHighestBid)
 		return &proto.Ack{Success: false, LogicalTime: s.lTime}, nil
 	}
 
 	return &proto.Ack{Success: true, LogicalTime: s.lTime}, nil
 }
 
-func (s* Server) Result(ctx context.Context, req *proto.Result) (*proto.CurrentBid, error) {
+func (s *Server) Result(ctx context.Context, req *proto.Result) (*proto.CurrentBid, error) {
 
 	if s.done {
 		return &proto.CurrentBid{Money: s.currentHighestBid, LogicalTime: s.lTime, Message: "auction is done"}, nil
@@ -126,4 +146,3 @@ func (s* Server) Result(ctx context.Context, req *proto.Result) (*proto.CurrentB
 
 	return &proto.CurrentBid{Money: s.currentHighestBid, LogicalTime: s.lTime}, nil
 }
-
