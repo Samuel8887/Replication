@@ -135,10 +135,48 @@ func (s *Server) Bid(ctx context.Context, req *proto.Bid) (*proto.Ack, error) {
 	}
 
 	if req.MessageBid > s.currentHighestBid {
+		conn, err := grpc.NewClient("localhost:8001", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("failed to connect to secondary server: %v", err)
+		}
+		secondaryClient := proto.NewReplicationClient(conn)
 		s.currentHighestBid = req.MessageBid
 		s.highestBidder = req.ClientId
 		log.Printf("New highest bid: %d", s.currentHighestBid)
+		highest := s.currentHighestBid
+		_, err = secondaryClient.Heartbeat(context.Background(), &proto.Heartbeat{
+				Succes:      true,
+				LogicalTime: s.lTime,
+				HighestBid:  highest,
+				ElapsedTime: s.elapsedTime,
+				Done:        s.done,
+				HighestBidderNow: s.highestBidder,
+				ArrayBids: s.clients,
+
+			})
+			if err != nil {
+				log.Println("Failed to send heartbeat to secondary:", err)
+			}
 	} else {
+		conn, err := grpc.NewClient("localhost:8001", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("failed to connect to secondary server: %v", err)
+		}
+	secondaryClient := proto.NewReplicationClient(conn)
+		highest := s.currentHighestBid
+		_, err = secondaryClient.Heartbeat(context.Background(), &proto.Heartbeat{
+				Succes:      true,
+				LogicalTime: s.lTime,
+				HighestBid:  highest,
+				ElapsedTime: s.elapsedTime,
+				Done:        s.done,
+				HighestBidderNow: s.highestBidder,
+				ArrayBids: s.clients,
+
+			})
+			if err != nil {
+				log.Println("Failed to send heartbeat to secondary:", err)
+			}
 		log.Printf("Bid of %d rejected; current highest bid is %d", req.MessageBid, s.currentHighestBid)
 		return &proto.Ack{Success: false, LogicalTime: s.lTime}, nil
 	}
